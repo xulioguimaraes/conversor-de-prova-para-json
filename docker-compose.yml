@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  revalida-api:
+    build: .
+    container_name: revalida-extractor-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persiste os uploads e extrações
+      - ./uploads:/app/uploads
+      - ./extractions:/app/extractions
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
