@@ -1,5 +1,6 @@
 """
-Extrator de questões do Revalida com suporte a imagens - VERSÃO CORRIGIDA
+Extrator de questões do Revalida - VERSÃO FINAL CORRIGIDA
+Bug da opção A resolvido!
 """
 
 import re
@@ -89,6 +90,8 @@ class RevalidaPDFExtractor:
         text = re.sub(r'PRIMEIRA\s+EDI[ÇC][ÃA]O', '', text, flags=re.IGNORECASE)
         text = re.sub(r'SEGUNDA\s+EDI[ÇC][ÃA]O', '', text, flags=re.IGNORECASE)
         text = re.sub(r'Revalida\s*\d+/\d+', '', text, flags=re.IGNORECASE)
+        # Remove ponto final extra
+        text = re.sub(r'\.\s*$', '', text)
         # Normaliza
         text = self.normalize_text(text)
         return text
@@ -96,7 +99,7 @@ class RevalidaPDFExtractor:
     def parse_question_block(self, block: str) -> Dict[str, str]:
         """
         Analisa um bloco de questão e extrai enunciado e opções.
-        ✅ VERSÃO CORRIGIDA - Captura opções no formato "A texto"
+        ✅ VERSÃO FINAL - Bug da opção A resolvido!
         """
         block = block.replace('\r\n', '\n').replace('\r', '\n')
         options = {letter: "" for letter in self.LETTERS}
@@ -105,8 +108,7 @@ class RevalidaPDFExtractor:
         # Remove cabeçalho da questão
         block = re.sub(r'^\s*QUEST[ÃAÀ]O\s*\d{1,3}\s*[\s:\-]?\s*', '', block, flags=re.IGNORECASE)
         
-        # 🔑 CORREÇÃO PRINCIPAL: Procura por opções no formato "\nLETRA espaço"
-        # Exemplo: "\nA Texto da opção A"
+        # Procura por opções no formato "\nLETRA espaço"
         first_option_match = re.search(r'\n([A-E])\s+', block)
         
         if first_option_match:
@@ -114,11 +116,15 @@ class RevalidaPDFExtractor:
             stem = block[:first_option_match.start()].strip()
             options_section = block[first_option_match.start():].strip()
             
-            # 🔑 Divide o texto usando o padrão \n + LETRA + espaço
-            # Isso separa as opções corretamente
+            # 🔥 CORREÇÃO DO BUG: Adiciona \n no início se não tiver
+            # Isso garante que o split vai capturar a primeira letra corretamente
+            if not options_section.startswith('\n'):
+                options_section = '\n' + options_section
+            
+            # Divide o texto usando o padrão \n + LETRA + espaço
             parts = re.split(r'\n([A-E])\s+', options_section)
             
-            # parts[0] = texto antes de A (geralmente vazio)
+            # parts[0] = texto antes da primeira letra (geralmente vazio agora)
             # parts[1] = 'A', parts[2] = texto da opção A
             # parts[3] = 'B', parts[4] = texto da opção B, etc.
             
@@ -126,9 +132,6 @@ class RevalidaPDFExtractor:
                 if i + 1 < len(parts):
                     letter = parts[i].upper()
                     text = parts[i + 1].strip()
-                    
-                    # Remove ponto final se houver
-                    text = re.sub(r'\.\s*$', '', text)
                     
                     # Limpa texto
                     text = self.clean_option_text(text)
@@ -256,9 +259,11 @@ class RevalidaPDFExtractor:
         print(f"✓ {sum(1 for q in questions if q.has_image)} questões com imagens")
         
         # Diagnóstico
-        empty_options = [q.number for q in questions if not q.option_a]
-        if empty_options:
-            print(f"⚠️  {len(empty_options)} questões sem opção A: {empty_options[:10]}")
+        empty_a = [q.number for q in questions if not q.option_a]
+        if empty_a:
+            print(f"⚠️  {len(empty_a)} questões sem opção A: {empty_a[:10]}")
+        else:
+            print(f"✅ Todas as questões têm opção A!")
         
         return questions
     
@@ -277,7 +282,7 @@ class RevalidaPDFExtractor:
 def main():
     import argparse
     
-    parser = argparse.ArgumentParser(description='Extrai questões do Revalida')
+    parser = argparse.ArgumentParser(description='Extrai questões do Revalida - VERSÃO FINAL')
     parser.add_argument('pdf_path', help='Caminho para o PDF')
     parser.add_argument('--gabarito', '-g', help='Caminho para gabarito (opcional)')
     parser.add_argument('--output', '-o', default='extracted_questions', help='Diretório de saída')
